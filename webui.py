@@ -41,8 +41,6 @@ max_val = 0.8
 reference_wavs = ["请选择参考音频或者自己上传"]
 # 单独预训练模型
 spk_new = ["无"]
-# loading
-loading = False
 
 
 def refresh_choices():
@@ -118,94 +116,84 @@ def change_instruction(mode_checkbox_group):
 
 def generate_audio(tts_text, mode_checkbox_group, sft_dropdown, prompt_text, prompt_wav_upload, prompt_wav_record,
                    instruct_text, seed, stream, speed, new_dropdown, gender):
-    global loading
-    if loading:
-        gr.Warning('音频合成中。。。请稍等！')
-        return
     if prompt_wav_upload is not None:
         prompt_wav = prompt_wav_upload
     elif prompt_wav_record is not None:
         prompt_wav = prompt_wav_record
     else:
         prompt_wav = None
-    try:
-        # if instruct mode, please make sure that model is iic/CosyVoice-300M-Instruct and not cross_lingual mode
-        if mode_checkbox_group in ['自然语言控制']:
-            if cosyvoice.instruct is False:
-                gr.Warning(
-                    '您正在使用自然语言控制模式, {}模型不支持此模式, 请使用iic/CosyVoice-300M-Instruct模型'.format(
-                        args.model_dir))
-                yield (cosyvoice.sample_rate, default_data)
-            if instruct_text == '':
-                gr.Warning('您正在使用自然语言控制模式, 请输入instruct文本')
-                yield (cosyvoice.sample_rate, default_data)
-            if prompt_wav is not None or prompt_text != '':
-                gr.Info('您正在使用自然语言控制模式, prompt音频/prompt文本会被忽略')
-        # if cross_lingual mode, please make sure that model is iic/CosyVoice-300M and tts_text prompt_text are different language
-        if mode_checkbox_group in ['跨语种复刻']:
-            if cosyvoice.instruct is True:
-                gr.Warning(
-                    '您正在使用跨语种复刻模式, {}模型不支持此模式, 请使用iic/CosyVoice-300M模型'.format(args.model_dir))
-                yield (cosyvoice.sample_rate, default_data)
-            if instruct_text != '':
-                gr.Info('您正在使用跨语种复刻模式, instruct文本会被忽略')
-            if prompt_wav is None:
-                gr.Warning('您正在使用跨语种复刻模式, 请提供prompt音频')
-                yield (cosyvoice.sample_rate, default_data)
-            gr.Info('您正在使用跨语种复刻模式, 请确保合成文本和prompt文本为不同语言')
-        # if in zero_shot cross_lingual, please make sure that prompt_text and prompt_wav meets requirements
-        if mode_checkbox_group in ['3s极速复刻', '跨语种复刻']:
-            if prompt_wav is None:
-                gr.Warning('prompt音频为空，您是否忘记输入prompt音频？')
-                yield (cosyvoice.sample_rate, default_data)
-            if torchaudio.info(prompt_wav).sample_rate < prompt_sr:
-                gr.Warning('prompt音频采样率{}低于{}'.format(torchaudio.info(prompt_wav).sample_rate, prompt_sr))
-                yield (cosyvoice.sample_rate, default_data)
-        # sft mode only use sft_dropdown
-        if mode_checkbox_group in ['预训练音色']:
-            if instruct_text != '' or prompt_wav is not None or prompt_text != '':
-                gr.Info('您正在使用预训练音色模式，prompt文本/prompt音频/instruct文本会被忽略！')
-            if sft_dropdown == '':
-                gr.Warning('没有可用的预训练音色！')
-                yield (cosyvoice.sample_rate, default_data)
-        # zero_shot mode only use prompt_wav prompt text
-        if mode_checkbox_group in ['3s极速复刻']:
-            if prompt_text == '':
-                gr.Warning('prompt文本为空，您是否忘记输入prompt文本？')
-                yield (cosyvoice.sample_rate, default_data)
-            if instruct_text != '':
-                gr.Info('您正在使用3s极速复刻模式，预训练音色/instruct文本会被忽略！')
-
-        if mode_checkbox_group == '预训练音色':
-            logging.info('get sft inference request')
-            set_all_random_seed(seed)
-            for i in cosyvoice.inference_sft(tts_text, sft_dropdown, stream=stream, speed=speed,
-                                             new_dropdown=new_dropdown,
-                                             gender=gender):
-                yield (cosyvoice.sample_rate, i['tts_speech'].numpy().flatten())
-        elif mode_checkbox_group == '3s极速复刻':
-            logging.info('get zero_shot inference request')
-            prompt_speech_16k = postprocess(load_wav(prompt_wav, prompt_sr))
-            set_all_random_seed(seed)
-            for i in cosyvoice.inference_zero_shot(tts_text, prompt_text, prompt_speech_16k, stream=stream,
-                                                   speed=speed):
-                yield (cosyvoice.sample_rate, i['tts_speech'].numpy().flatten())
-        elif mode_checkbox_group == '跨语种复刻':
-            logging.info('get cross_lingual inference request')
-            prompt_speech_16k = postprocess(load_wav(prompt_wav, prompt_sr))
-            set_all_random_seed(seed)
-            for i in cosyvoice.inference_cross_lingual(tts_text, prompt_speech_16k, stream=stream, speed=speed):
-                yield (cosyvoice.sample_rate, i['tts_speech'].numpy().flatten())
-        else:
-            logging.info('get instruct inference request')
-            set_all_random_seed(seed)
-            for i in cosyvoice.inference_instruct(tts_text, sft_dropdown, instruct_text, stream=stream, speed=speed):
-                yield (cosyvoice.sample_rate, i['tts_speech'].numpy().flatten())
-    except Exception:
-        loading = False
-        gr.Warning('发生错误，请检查您的输入是否正确！')
-    finally:
-        loading = False
+    # if instruct mode, please make sure that model is iic/CosyVoice-300M-Instruct and not cross_lingual mode
+    if mode_checkbox_group in ['自然语言控制']:
+        if cosyvoice.instruct is False:
+            gr.Warning(
+                '您正在使用自然语言控制模式, {}模型不支持此模式, 请使用iic/CosyVoice-300M-Instruct模型'.format(
+                    args.model_dir))
+            yield (cosyvoice.sample_rate, default_data)
+        if instruct_text == '':
+            gr.Warning('您正在使用自然语言控制模式, 请输入instruct文本')
+            yield (cosyvoice.sample_rate, default_data)
+        if prompt_wav is not None or prompt_text != '':
+            gr.Info('您正在使用自然语言控制模式, prompt音频/prompt文本会被忽略')
+    # if cross_lingual mode, please make sure that model is iic/CosyVoice-300M and tts_text prompt_text are different language
+    if mode_checkbox_group in ['跨语种复刻']:
+        if cosyvoice.instruct is True:
+            gr.Warning(
+                '您正在使用跨语种复刻模式, {}模型不支持此模式, 请使用iic/CosyVoice-300M模型'.format(args.model_dir))
+            yield (cosyvoice.sample_rate, default_data)
+        if instruct_text != '':
+            gr.Info('您正在使用跨语种复刻模式, instruct文本会被忽略')
+        if prompt_wav is None:
+            gr.Warning('您正在使用跨语种复刻模式, 请提供prompt音频')
+            yield (cosyvoice.sample_rate, default_data)
+        gr.Info('您正在使用跨语种复刻模式, 请确保合成文本和prompt文本为不同语言')
+    # if in zero_shot cross_lingual, please make sure that prompt_text and prompt_wav meets requirements
+    if mode_checkbox_group in ['3s极速复刻', '跨语种复刻']:
+        if prompt_wav is None:
+            gr.Warning('prompt音频为空，您是否忘记输入prompt音频？')
+            yield (cosyvoice.sample_rate, default_data)
+        if torchaudio.info(prompt_wav).sample_rate < prompt_sr:
+            gr.Warning('prompt音频采样率{}低于{}'.format(torchaudio.info(prompt_wav).sample_rate, prompt_sr))
+            yield (cosyvoice.sample_rate, default_data)
+    # sft mode only use sft_dropdown
+    if mode_checkbox_group in ['预训练音色']:
+        if instruct_text != '' or prompt_wav is not None or prompt_text != '':
+            gr.Info('您正在使用预训练音色模式，prompt文本/prompt音频/instruct文本会被忽略！')
+        if sft_dropdown == '':
+            gr.Warning('没有可用的预训练音色！')
+            yield (cosyvoice.sample_rate, default_data)
+    # zero_shot mode only use prompt_wav prompt text
+    if mode_checkbox_group in ['3s极速复刻']:
+        if prompt_text == '':
+            gr.Warning('prompt文本为空，您是否忘记输入prompt文本？')
+            yield (cosyvoice.sample_rate, default_data)
+        if instruct_text != '':
+            gr.Info('您正在使用3s极速复刻模式，预训练音色/instruct文本会被忽略！')
+    if mode_checkbox_group == '预训练音色':
+        logging.info('get sft inference request')
+        set_all_random_seed(seed)
+        for i in cosyvoice.inference_sft(tts_text, sft_dropdown, stream=stream, speed=speed,
+                                         new_dropdown=new_dropdown,
+                                         gender=gender):
+            yield (cosyvoice.sample_rate, i['tts_speech'].numpy().flatten())
+    elif mode_checkbox_group == '3s极速复刻':
+        logging.info('get zero_shot inference request')
+        prompt_speech_16k = postprocess(load_wav(prompt_wav, prompt_sr))
+        set_all_random_seed(seed)
+        for i in cosyvoice.inference_zero_shot(tts_text, prompt_text, prompt_speech_16k, stream=stream,
+                                               speed=speed):
+            yield (cosyvoice.sample_rate, i['tts_speech'].numpy().flatten())
+    elif mode_checkbox_group == '跨语种复刻':
+        logging.info('get cross_lingual inference request')
+        prompt_speech_16k = postprocess(load_wav(prompt_wav, prompt_sr))
+        set_all_random_seed(seed)
+        for i in cosyvoice.inference_cross_lingual(tts_text, prompt_speech_16k, stream=stream, speed=speed):
+            yield (cosyvoice.sample_rate, i['tts_speech'].numpy().flatten())
+    else:
+        logging.info('get instruct inference request')
+        set_all_random_seed(seed)
+        for i in cosyvoice.inference_instruct(tts_text, sft_dropdown, instruct_text, stream=stream, speed=speed):
+            yield (cosyvoice.sample_rate, i['tts_speech'].numpy().flatten())
+    gr.Info('合成完成')
 
 
 def main():

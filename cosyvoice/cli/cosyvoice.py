@@ -204,8 +204,9 @@ class CosyVoice:
         print('合成完成:', date)
         # 先屏蔽合成音频
         # 直接在页面下载文件还小些
-        # audio_data = torch.concat(tts_speeches, dim=1)
-        # torchaudio.save(f"音频输出/output-{date}.wav", audio_data, my_sample_rate)
+        # 虽然小但是会出现不会返回音频的情况，所以还是做个本地音频文件保存
+        audio_data = torch.concat(tts_speeches, dim=1)
+        torchaudio.save(f"音频输出/output-{date}.wav", audio_data, my_sample_rate)
         with open(f'音频输出/output-{date}.srt', 'w', encoding='utf-8') as f:
             f.writelines(srtlines)
         # 额外代码  -end
