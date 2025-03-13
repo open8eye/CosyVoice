@@ -120,7 +120,7 @@ class CosyVoice:
         return spks
 
     def inference_sft(self, tts_text: str, spk_id: str, stream: bool = False, speed: float = 1.0,
-                      text_frontend: bool = True, new_dropdown: str = "无") -> Generator:
+                      text_frontend: bool = True, new_dropdown: str = "无", gender: bool = True) -> Generator:
         """SFT模式推理：基于说话人ID的文本到语音合成
         
         Args:
@@ -129,6 +129,7 @@ class CosyVoice:
             stream (bool): 是否启用流式输出
             speed (float): 语速调节系数（0.5-2.0）
             text_frontend (bool): 是否使用文本前端处理
+            [('男', False), ('女', True)]
         
         Yields:
             dict: 包含语音数据的模型输出字典
@@ -146,10 +147,14 @@ class CosyVoice:
         # 采样频率 默认 22050
         my_sample_rate = self.sample_rate if self.sample_rate else 22050
         print('采样频率>>>', my_sample_rate)
+        print('spk_id>>>', spk_id)
         for text_segment in tqdm(self.frontend.text_normalize(tts_text, split=True, text_frontend=text_frontend)):
             if new_dropdown != "无" or spk_id not in default_voices:
                 # 加载自定义说话人特征
-                model_input = self.frontend.frontend_sft(text_segment, "中文女")
+                if gender == True:
+                    model_input = self.frontend.frontend_sft(text_segment, "中文女")
+                else:
+                    model_input = self.frontend.frontend_sft(text_segment, "中文男")
                 voice_path = f'{grandparent_dir}/voices/{new_dropdown}.pt' if new_dropdown != "无" else f'{grandparent_dir}/voices/{spk_id}.pt'
                 newspk = torch.load(voice_path)
                 # 替换模型输入的说话人嵌入和提示信息
@@ -196,6 +201,7 @@ class CosyVoice:
                 start_time = time.time()
         # 额外代码  -start
         date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        print('合成完成:', date)
         # 先屏蔽合成音频
         # 直接在页面下载文件还小些
         # audio_data = torch.concat(tts_speeches, dim=1)
@@ -225,6 +231,8 @@ class CosyVoice:
                                                            self.sample_rate)
             start_time = time.time()
             logging.info(f'synthesis text {text_segment}')
+            # 保存数据
+            torch.save(model_input, 'output.pt')
             for model_output in self.model.tts(**model_input, stream=stream, speed=speed):
                 speech_len = model_output['tts_speech'].shape[1] / self.sample_rate
                 logging.info(f'yield speech len {speech_len}, rtf {(time.time() - start_time) / speech_len}')
