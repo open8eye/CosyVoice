@@ -1,0 +1,10 @@
+这是用于fork cosyvoice同步的分支，pro分支添加了生成字幕文件，新增音色和保存当前音色功能
+环境使用:
+conda 24.11.3
+python 3.11.11
+NVIDIA-SMI 545.84
+Driver Version: 545.84
+CUDA Version: 12.3
+
+base 分支fork https://github.com/FunAudioLLM/CosyVoice
+pro 分支大部分代码源自 https://github.com/v3ucn/CosyVoice_For_Windows
