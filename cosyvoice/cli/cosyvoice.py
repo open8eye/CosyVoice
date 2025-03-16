@@ -120,7 +120,8 @@ class CosyVoice:
         return spks
 
     def inference_sft(self, tts_text: str, spk_id: str, stream: bool = False, speed: float = 1.0,
-                      text_frontend: bool = True, new_dropdown: str = "无", gender: bool = True) -> Generator:
+                      text_frontend: bool = True, new_dropdown: str = "无", gender: bool = True,
+                      is_save: bool = False) -> Generator:
         """SFT模式推理：基于说话人ID的文本到语音合成
         
         Args:
@@ -148,7 +149,8 @@ class CosyVoice:
         my_sample_rate = self.sample_rate if self.sample_rate else 22050
         print('采样频率>>>', my_sample_rate)
         print('spk_id>>>', spk_id)
-        for text_segment in tqdm(self.frontend.text_normalize(tts_text, split=True, text_frontend=text_frontend)):
+        for text_segment in tqdm(
+                self.frontend.text_normalize(tts_text, split=True, text_frontend=text_frontend)):
             if new_dropdown != "无" or spk_id not in default_voices:
                 # 加载自定义说话人特征
                 if gender == True:
@@ -183,32 +185,34 @@ class CosyVoice:
 
                 # 额外代码  -start
                 # 语音合成
-                audio = model_output['tts_speech'].numpy().ravel()
-                audio_opt.append(audio)
-                # 生成字幕文件
-                srtline_begin = ms_to_srt_time(audio_samples * 1000.0 / my_sample_rate)
-                audio_samples += audio.size
-                srtline_end = ms_to_srt_time(audio_samples * 1000.0 / my_sample_rate)
+                if is_save:
+                    audio = model_output['tts_speech'].numpy().ravel()
+                    audio_opt.append(audio)
+                    # 生成字幕文件
+                    srtline_begin = ms_to_srt_time(audio_samples * 1000.0 / my_sample_rate)
+                    audio_samples += audio.size
+                    srtline_end = ms_to_srt_time(audio_samples * 1000.0 / my_sample_rate)
 
-                srtlines.append(f"{len(audio_opt):02d}\n")
-                srtlines.append(f"{srtline_begin} --> {srtline_end}\n")
-                srtlines.append(f"{text_segment.replace('、。', '')}\n\n")
+                    srtlines.append(f"{len(audio_opt):02d}\n")
+                    srtlines.append(f"{srtline_begin} --> {srtline_end}\n")
+                    srtlines.append(f"{text_segment.replace('、。', '')}\n\n")
 
-                tts_speeches.append(model_output['tts_speech'])
+                    tts_speeches.append(model_output['tts_speech'])
                 # 额外代码  -end
 
                 yield model_output
                 start_time = time.time()
         # 额外代码  -start
-        date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        print('合成完成:', date)
-        # 先屏蔽合成音频
-        # 直接在页面下载文件还小些
-        # 虽然小但是会出现不会返回音频的情况，所以还是做个本地音频文件保存
-        audio_data = torch.concat(tts_speeches, dim=1)
-        torchaudio.save(f"音频输出/output-{date}.wav", audio_data, my_sample_rate)
-        with open(f'音频输出/output-{date}.srt', 'w', encoding='utf-8') as f:
-            f.writelines(srtlines)
+        if is_save:
+            date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            print('合成完成:', date)
+            # 先屏蔽合成音频
+            # 直接在页面下载文件还小些
+            # 虽然小但是会出现不会返回音频的情况，所以还是做个本地音频文件保存
+            audio_data = torch.concat(tts_speeches, dim=1)
+            torchaudio.save(f"音频输出/output-{date}.wav", audio_data, my_sample_rate)
+            with open(f'音频输出/output-{date}.srt', 'w', encoding='utf-8') as f:
+                f.writelines(srtlines)
         # 额外代码  -end
 
     def inference_zero_shot(self, tts_text: str, prompt_text: str, prompt_speech_16k: torch.Tensor,
